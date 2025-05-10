@@ -1,0 +1,6 @@
+FROM alpine:3.20.3
+RUN apk upgrade --no-cache \
+    && apk add --no-cache bind-tools chromium ca-certificates
+COPY num8 /usr/local/bin/
+CMD ["num8","launch"]
+WORKDIR /app

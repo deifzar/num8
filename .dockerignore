@@ -1,0 +1,13 @@
+bin
+*/log/*.log
+*/log/*.log.gz
+num8
+*/icon
+*/tmp/*
+*.log
+*.cfg
+*.yml
+*.yaml
+help.txt
+dockerfile
+.dockerignore
