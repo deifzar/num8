@@ -56,7 +56,7 @@ func (a *Api8) Init() error {
 		log8.BaseLogger.Error().Msg("Error bringing up the RabbitMQ queues for the `num8` service.")
 		return err
 	}
-	orchestrator8.CreateHandleAPICall()
+	orchestrator8.CreateHandleAPICallByService("num8")
 	orchestrator8.ActivateConsumerByService("num8")
 
 	a.Cnfg = v
