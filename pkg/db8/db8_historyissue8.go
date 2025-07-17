@@ -79,32 +79,40 @@ func (m *Db8Historyissue8) GetAllHistoryIssues() ([]model8.Historyissue8, error)
 	return historyissues, nil
 }
 
-func (m *Db8Historyissue8) InsertBatch(historyIssues8 []model8.Historyissue8) error {
+func (m *Db8Historyissue8) InsertBatch(historyIssues8 []model8.Historyissue8) (bool, error) {
+	var changes_occurred bool = false
 	tx, err := m.Db.Begin()
 	if err != nil {
 		log8.BaseLogger.Debug().Msg(err.Error())
-		return err
+		return false, err
 	}
 	stmt, err := tx.Prepare(`INSERT INTO cptm8historyissue (endpointid, url, signature, issue, status, firsttimefound) VALUES ($1, $2, $3, $4, $5, NOW()) ON CONFLICT (signature) DO UPDATE SET status = EXCLUDED.status`)
 	if err != nil {
 		log8.BaseLogger.Debug().Msg(err.Error())
-		return err
+		return false, err
 	}
 	defer stmt.Close()
 	var err2 error
 	for _, h := range historyIssues8 {
-		_, err2 = stmt.Exec(h.Endpointid, h.Url, h.Signature, h.Issue, h.Status)
+		result, err2 := stmt.Exec(h.Endpointid, h.Url, h.Signature, h.Issue, h.Status)
 		if err2 != nil {
 			_ = tx.Rollback()
 			log8.BaseLogger.Debug().Msg(err2.Error())
-			return err2
+			return false, err2
+		}
+		// Check if any rows were affected (new insert or live status changed)
+		if !changes_occurred {
+			rows, _ := result.RowsAffected()
+			if rows > 0 {
+				changes_occurred = true
+			}
 		}
 	}
 	err2 = tx.Commit()
 	if err2 != nil {
 		_ = tx.Rollback()
 		log8.BaseLogger.Debug().Msg(err2.Error())
-		return err
+		return false, err
 	}
-	return nil
+	return changes_occurred, nil
 }

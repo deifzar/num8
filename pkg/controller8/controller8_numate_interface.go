@@ -15,7 +15,7 @@ type Controller8NumateInterface interface {
 	// ConfigureEngine(model8.PostOptionsScan8) (model8.Model8Options8Interface, model8.Model8Results8Interface, error)
 	ConfigureEngine(model8.PostOptionsScan8) (model8.Model8Options8Interface, string, error)
 	RunNumate(bool, orchestrator8.Orchestrator8Interface, []model8.Endpoint8, model8.Model8Options8Interface, string)
-	CommitResults([]model8.SecurityIssues8, []model8.Endpoint8) error
+	CommitResults([]model8.SecurityIssues8, []model8.Endpoint8) (bool, error)
 	// RunNumate([]model8.Httpendpoint8, model8.Model8Options8Interface, model8.Model8Results8Interface)
 	// RabbitMQBringConsumerBackAndPublishMessage() error
 }
