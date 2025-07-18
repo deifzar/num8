@@ -6,6 +6,7 @@ package cmd
 import (
 	"deifzar/num8/pkg/api8"
 	"deifzar/num8/pkg/log8"
+	"deifzar/num8/pkg/notification8"
 	"deifzar/num8/pkg/utils"
 	"errors"
 	"fmt"
@@ -47,6 +48,7 @@ var launchCmd = &cobra.Command{
 			if err != nil {
 				log8.BaseLogger.Debug().Msg(err.Error())
 				log8.BaseLogger.Fatal().Msg("Error in `Launch` command line when initialising the API endpoint.")
+				notification8.Helper.PublishSysErrorNotification("Error in `Launch` command line when initialising the API endpoint", "urgent", "num8")
 				return err
 			}
 			a.Routes()

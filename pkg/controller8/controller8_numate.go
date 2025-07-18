@@ -7,6 +7,7 @@ import (
 	"deifzar/num8/pkg/db8"
 	"deifzar/num8/pkg/log8"
 	"deifzar/num8/pkg/model8"
+	"deifzar/num8/pkg/notification8"
 	"deifzar/num8/pkg/orchestrator8"
 	"encoding/hex"
 	"net/http"
@@ -110,17 +111,18 @@ func (m *Controller8Numate) NumateScan(c *gin.Context) {
 		e8, err := endpoint8.GetAllHTTPEndpoints()
 		if err != nil {
 			// move on and call asmm8 scan
-			orchestrator8.PublishToExchangeAndCloseChannelConnection(exchange, "cptm8.asmm8.get.scan", nil, "num8")
-			c.JSON(http.StatusBadGateway, gin.H{"status": "error", "msg": "Num8 Scan failed - Error fetching the endpoints."})
 			log8.BaseLogger.Debug().Msg(err.Error())
 			log8.BaseLogger.Warn().Msg("HTTP Repose 500 - Num8 Scan failed - Error fetching the endpoints.")
+			orchestrator8.PublishToExchangeAndCloseChannelConnection(exchange, "cptm8.asmm8.get.scan", nil, "num8")
+			notification8.Helper.PublishSysErrorNotification("NumateScan - Error fetching the endpoints.", "urgent", "num8")
+			c.JSON(http.StatusBadGateway, gin.H{"status": "error", "msg": "Num8 Scan failed - Error fetching the endpoints."})
 			return
 		}
 		if len(e8) < 1 {
 			// move on and call asmm8 scan
+			log8.BaseLogger.Info().Msg("Num8 scan API call success. No targets in scope")
 			orchestrator8.PublishToExchangeAndCloseChannelConnection(exchange, "cptm8.asmm8.get.scan", nil, "num8")
 			c.JSON(http.StatusOK, gin.H{"msg": "Num8 scan API call success. No targets in scope."})
-			log8.BaseLogger.Info().Msg("Num8 scan API call success. No targets in scope")
 			return
 		}
 		var post model8.PostOptionsScan8
@@ -129,10 +131,11 @@ func (m *Controller8Numate) NumateScan(c *gin.Context) {
 		options8, outputFileName, err := m.ConfigureEngine(post)
 		if err != nil {
 			// move on and call asmm8 scan
-			orchestrator8.PublishToExchangeAndCloseChannelConnection(exchange, "cptm8.asmm8.get.scan", nil, "num8")
-			c.JSON(http.StatusBadGateway, gin.H{"status": "error", "msg": "Numate Scan failed - scan configuration failed"})
 			log8.BaseLogger.Debug().Msg(err.Error())
 			log8.BaseLogger.Warn().Msg("HTTP Repose 500 - Num8 Scan failed - scan configuration failed")
+			orchestrator8.PublishToExchangeAndCloseChannelConnection(exchange, "cptm8.asmm8.get.scan", nil, "num8")
+			notification8.Helper.PublishSysErrorNotification("NumateScan - scan configuration has failed.", "urgent", "num8")
+			c.JSON(http.StatusBadGateway, gin.H{"status": "error", "msg": "Numate Scan failed - scan configuration has failed"})
 			return
 		}
 		// // cancel consumer
@@ -148,8 +151,9 @@ func (m *Controller8Numate) NumateScan(c *gin.Context) {
 		err = orchestrator8.ActivateQueueByService("num8")
 		if err != nil {
 			// move on and call asmm8 scan
-			orchestrator8.PublishToExchangeAndCloseChannelConnection(exchange, "cptm8.asmm8.get.scan", nil, "num8")
 			log8.BaseLogger.Fatal().Msg("HTTP 500 Response - Num8 Scans failed - Error bringing up the RabbitMQ queues for the Num8 service.")
+			orchestrator8.PublishToExchangeAndCloseChannelConnection(exchange, "cptm8.asmm8.get.scan", nil, "num8")
+			notification8.Helper.PublishSysErrorNotification("NumateScan - Error bringing up the RabbitMQ queues for the Num8 service.", "urgent", "num8")
 			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "msg": "Num8 Scans failed. Error bringing up the RabbitMQ queues for the Num8 service."})
 			return
 		}
@@ -159,9 +163,10 @@ func (m *Controller8Numate) NumateScan(c *gin.Context) {
 		go m.RunNumate(true, orchestrator8, e8, options8, outputFileName)
 	} else {
 		// move on and call asmm8 scan
-		orchestrator8.PublishToExchangeAndCloseChannelConnection(exchange, "cptm8.asmm8.get.scan", nil, "num8")
-		c.JSON(http.StatusForbidden, gin.H{"status": "forbidden", "msg": "Num8 Scans failed - Launching Num8 Scan is not possible at this moment due to non-existent RabbitMQ queues."})
 		log8.BaseLogger.Info().Msg("Num8 Scan API call forbidden")
+		orchestrator8.PublishToExchangeAndCloseChannelConnection(exchange, "cptm8.asmm8.get.scan", nil, "num8")
+		notification8.Helper.PublishSysErrorNotification("NumateScan - Launching Num8 Scan is not possible at this moment due to non-existent RabbitMQ queues.", "urgent", "num8")
+		c.JSON(http.StatusForbidden, gin.H{"status": "forbidden", "msg": "Num8 Scans failed - Launching Num8 Scan is not possible at this moment due to non-existent RabbitMQ queues."})
 		return
 	}
 }
@@ -459,7 +464,7 @@ func (m *Controller8Numate) RunNumate(fullscan bool, orch8 orchestrator8.Orchest
 	}
 
 	// Commit latest Num8 results into the DB
-	notify, err := m.CommitResults(securityIssues, e8)
+	notify, urgent, err := m.CommitResults(securityIssues, e8)
 	if err != nil {
 		log8.BaseLogger.Error().Msg("error after attempt to commit results")
 		return
@@ -469,28 +474,8 @@ func (m *Controller8Numate) RunNumate(fullscan bool, orch8 orchestrator8.Orchest
 		exchange := m.Cnfg.GetStringSlice("ORCHESTRATORM8.asmm8.Queue")[0]
 		orch8.PublishToExchangeAndCloseChannelConnection(exchange, "cptm8.asmm8.get.scan", nil, "num8")
 		if notify {
-			// send notification
-			metadata := model8.NotificationMetadata8{
-				Severity:    "normal",
-				Channeltype: model8.App,
-				Eventtype:   model8.Security,
-			}
-			notification_user := model8.Notification8{
-				Userrole: model8.RoleUser,
-				Type:     model8.Security,
-				Message:  "New security issues have been found",
-				Metadata: metadata,
-			}
-
-			notification_admin := model8.Notification8{
-				Userrole: model8.RoleAdmin,
-				Type:     model8.Security,
-				Message:  "New security issues have been found",
-				Metadata: metadata,
-			}
-
-			orch8.PublishToExchangeAndCloseChannelConnection("notification", "app.security.normal", notification_user, "num8")
-			orch8.PublishToExchangeAndCloseChannelConnection("notification", "app.security.normal", notification_admin, "num8")
+			notification8.Helper.PublishSecurityNotificationAdmin("New security issues have been found", urgent, "num8")
+			notification8.Helper.PublishSecurityNotificationUser("New security issues have been found", urgent, "num8")
 		}
 	}
 }
@@ -536,40 +521,21 @@ func (m *Controller8Numate) RunNumateThoroughly(e8 []model8.Endpoint8, orch8 orc
 	}
 
 	// Commit latest Num8 results into the DB
-	notify, err := m.CommitResults(securityIssues, e8)
+	notify, urgent, err := m.CommitResults(securityIssues, e8)
 	if err != nil {
 		log8.BaseLogger.Error().Msg("error after attempt to commit results")
 		return
 	}
 	if notify && orch8 != nil {
-		// send notification
-		metadata := model8.NotificationMetadata8{
-			Severity:    "normal",
-			Channeltype: model8.App,
-			Eventtype:   model8.Security,
-		}
-		notification_user := model8.Notification8{
-			Userrole: model8.RoleUser,
-			Type:     model8.Security,
-			Message:  "New security issues have been found",
-			Metadata: metadata,
-		}
-
-		notification_admin := model8.Notification8{
-			Userrole: model8.RoleAdmin,
-			Type:     model8.Security,
-			Message:  "New security issues have been found",
-			Metadata: metadata,
-		}
-
-		orch8.PublishToExchangeAndCloseChannelConnection("notification", "app.security.normal", notification_user, "num8")
-		orch8.PublishToExchangeAndCloseChannelConnection("notification", "app.security.normal", notification_admin, "num8")
+		notification8.Helper.PublishSecurityNotificationAdmin("New security issues have been found", urgent, "num8")
+		notification8.Helper.PublishSecurityNotificationUser("New security issues have been found", urgent, "num8")
 	}
 
 }
 
 // CommitResults will insert the issues found into the database. This function internally parses the slice of `securityissues8` into a slice of `historyissue8` DB model.
-func (m *Controller8Numate) CommitResults(securityIssues []model8.SecurityIssues8, e8 []model8.Endpoint8) (bool, error) {
+// Returns one boolean value that flags if new security issues have been found and one string value with the highest severity risk finding: critical, high or normal
+func (m *Controller8Numate) CommitResults(securityIssues []model8.SecurityIssues8, e8 []model8.Endpoint8) (bool, string, error) {
 	var historyissues []model8.Historyissue8
 	// prepare historyissues slice
 	for _, si := range securityIssues {
@@ -666,27 +632,31 @@ func (m *Controller8Numate) CommitResults(securityIssues []model8.SecurityIssues
 	currentHistoryIusses, err := dbHistoryissue8.GetAllHistoryIssuesByStatus(model8.Falsepositive)
 	if err != nil {
 		log8.BaseLogger.Error().Msgf("Error fetching False Positives security issues from DB")
-		return false, err
+		return false, "", err
 	}
 	// Fetch all `I` signatures from database and delete the ones found from the list
 	ignored, err := dbHistoryissue8.GetAllHistoryIssuesByStatus(model8.Ignored)
 	if err != nil {
 		log8.BaseLogger.Error().Msgf("Error fetching Ignored security issues from DB")
-		return false, err
+		return false, "", err
 	}
 	currentHistoryIusses = append(currentHistoryIusses, ignored...)
 	// Fetch all `V` signatures from database and delete the ones found from the list
 	verified, err := dbHistoryissue8.GetAllHistoryIssuesByStatus(model8.Verified)
 	if err != nil {
 		log8.BaseLogger.Error().Msgf("Error fetching Verified security issues from DB")
-		return false, err
+		return false, "", err
 	}
 	currentHistoryIusses = append(currentHistoryIusses, verified...)
 	historyissues = model8.DifferenceHistoryissues8(historyissues, currentHistoryIusses)
 	changes_occurred, err := dbHistoryissue8.InsertBatch(historyissues)
+	var urgent = "normal"
 	if err != nil {
 		log8.BaseLogger.Error().Msgf("Error inserting the new security issues found into the DB")
-		return false, err
+		return false, "", err
 	}
-	return changes_occurred, err
+	if changes_occurred {
+		urgent = model8.ExistCriticalOrHighRiskSeverityHistoryissue8(historyissues)
+	}
+	return changes_occurred, urgent, err
 }

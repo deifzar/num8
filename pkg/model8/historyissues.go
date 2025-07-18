@@ -56,3 +56,19 @@ func RemoveDuplicatesHistoryissues8(slice []Historyissue8) []Historyissue8 {
 	}
 	return result
 }
+
+// Return highest risk severity found: critical, high or normal
+func ExistCriticalOrHighRiskSeverityHistoryissue8(slice []Historyissue8) string {
+	var severity = "normal"
+	for _, h8 := range slice {
+		if h8.Issue.Severity == "high" {
+			severity = "high"
+			continue
+		}
+		if h8.Issue.Severity == "critical" {
+			severity = "critical"
+			return severity
+		}
+	}
+	return severity
+}
