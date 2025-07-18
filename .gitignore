@@ -26,3 +26,9 @@ tmp/*
 
 # discord settings
 /discord
+
+# docs folder
+docs/*
+
+# AI
+CLAUDE.md
