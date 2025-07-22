@@ -1,4 +1,6 @@
 bin
+*/app/*
+*/docs/*
 */log/*.log
 */log/*.log.gz
 num8
