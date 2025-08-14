@@ -1,6 +1,22 @@
-FROM alpine:3.20.3
+# Build
+FROM alpine:3.20
+# Install only required build dependencies
 RUN apk upgrade --no-cache \
-    && apk add --no-cache bind-tools chromium ca-certificates
-COPY num8 /usr/local/bin/
-CMD ["num8","launch"]
+    && apk add --no-cache bind-tools chromium ca-certificates tzdata \
+    && apk --no-cache upgrade \
+    && rm -rf /var/cache/apk/* \
+    && adduser -D -g '' appuser
+
+COPY --chown=appuser:appuser num8 /usr/local/bin/
+# Security: Switch to non-root user
+USER appuser
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD num8 --help || exit 1
+
 WORKDIR /app
+
+# Expose port (document the port used)
+# EXPOSE 8000
+
+CMD ["num8","launch"]

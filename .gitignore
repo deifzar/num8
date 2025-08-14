@@ -10,7 +10,7 @@
 resume.cfg
 
 # app folder
-app/
+app/*
 
 # bin folder
 bin/*

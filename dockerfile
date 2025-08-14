@@ -1,12 +1,30 @@
 # Build
-FROM golang:1.24.0-alpine AS build-env
-RUN apk add build-base
+FROM golang:1.23-alpine3.20 AS builder
+RUN apk add --no-cache build-base \
+    && adduser -D -g '' appuser
 WORKDIR /app
-COPY . /app
+
+# Copy go mod files first for better caching
+COPY go.mod go.sum ./
 RUN go mod download
-RUN go build .
+
+COPY . .
+
+# Build with security flags
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags='-w -s -extldflags "-static"' \
+    -a -installsuffix cgo \
+    -o num8 .
 
 # Release
-FROM alpine:3.20.3
-COPY --from=build-env /app/num8 /usr/local/bin/
+FROM alpine:3.20
+RUN adduser -D -g '' -s /bin/sh appuser
+COPY --from=builder --chown=appuser:appuser /app/num8 /usr/local/bin/
+# Security: Switch to non-root user
+USER appuser
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD num8 --help || exit 1
+# Expose port (document the port used)
+# EXPOSE 8000
 CMD ["num8","help"]
