@@ -1,8 +1,8 @@
 # Build
 FROM golang:1.23-alpine3.20 AS builder
 RUN apk update && \ 
-    apk add --no-cache ca-certificates tzdata \
-    && adduser -D -g '' appuser
+    apk add --no-cache ca-certificates tzdata && \
+    adduser -D -g '' appuser
 WORKDIR /app
 
 # Copy go mod files first for better caching
@@ -20,9 +20,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # Release
 FROM alpine:3.20
 RUN apk upgrade --no-cache && \
-    apk add --no-cache ca-certificates tzdata \
-    && apk --no-cache upgrade \
-    && rm -rf /var/cache/apk/* \
+    apk add --no-cache ca-certificates tzdata && \
+    apk --no-cache upgrade && \
+    rm -rf /var/cache/apk/* && \
     adduser -D -g '' -s /bin/sh appuser
 COPY --from=builder --chown=appuser:appuser /app/num8 /usr/local/bin/
 # Security: Switch to non-root user
