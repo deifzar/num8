@@ -18,7 +18,16 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 
 # Release
 FROM alpine:3.20
-RUN adduser -D -g '' -s /bin/sh appuser
+RUN apk add --no-cache \
+    ca-certificates \
+    libpcap \
+    nmap \
+    nmap-scripts \
+    bind-tools \
+    curl \
+    openssl \
+    tini && \
+    adduser -D -g '' -s /bin/sh appuser
 COPY --from=builder --chown=appuser:appuser /app/num8 /usr/local/bin/
 # Security: Switch to non-root user
 USER appuser
