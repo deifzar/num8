@@ -20,7 +20,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # Release
 FROM alpine:3.20
 RUN apk upgrade --no-cache && \
-    apk add --no-cache ca-certificates tzdata && \
+    apk add --no-cache chromium ca-certificates tzdata && \
     apk --no-cache upgrade && \
     rm -rf /var/cache/apk/* && \
     adduser -D -g '' -s /bin/sh appuser
