@@ -35,7 +35,6 @@ func NewAmqpM8(location string, port int, username, password string) (AmqpM8Inte
 		log8.BaseLogger.Warn().Msgf("Failed to connect to RabbitMQ (attempt %d/10): %v", retries+1, err)
 		time.Sleep(5 * time.Second)
 	}
-	// conn, err := amqp.Dial(connString)
 
 	ch, err := conn.Channel()
 	log8.BaseLogger.Info().Msg("Creating channel in the RabbitMQ server ...")
