@@ -45,6 +45,7 @@ func (a *Api8) Init() error {
 	orchestrator8, err := orchestrator8.NewOrchestrator8()
 	if err != nil {
 		log8.BaseLogger.Error().Msg("Error connecting to the RabbitMQ server.")
+		return err
 	}
 	err = orchestrator8.InitOrchestrator()
 	if err != nil {
