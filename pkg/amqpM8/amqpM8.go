@@ -33,6 +33,7 @@ func NewAmqpM8(location string, port int, username, password string) (AmqpM8Inte
 			break // Connection successful
 		}
 		if retries == 9 {
+			log8.BaseLogger.Debug().Msg(err.Error())
 			return nil, err
 		}
 		log8.BaseLogger.Warn().Msgf("Failed to connect to RabbitMQ (attempt %d/10): %v", retries+1, err)
