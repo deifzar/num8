@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha512"
 	"database/sql"
+	"deifzar/num8/pkg/cleanup8"
 	"deifzar/num8/pkg/db8"
 	"deifzar/num8/pkg/log8"
 	"deifzar/num8/pkg/model8"
@@ -14,6 +15,7 @@ import (
 	"net/url"
 	"reflect"
 	"strconv"
+	"time"
 
 	"github.com/spf13/viper"
 
@@ -94,6 +96,12 @@ func (m *Controller8Numate) ConfigureEngine(p model8.PostOptionsScan8) (model8.M
 // NumateScan will run only with what the configuration.yaml file contains: the `turl` property.
 // The scans will run across all the domains and only through their root HTTP Endpoints
 func (m *Controller8Numate) NumateScan(c *gin.Context) {
+	// Clean up old files in tmp directory (older than 24 hours)
+	cleanup := cleanup8.NewCleanup8()
+	if err := cleanup.CleanupDirectory("tmp", 24*time.Hour); err != nil {
+		log8.BaseLogger.Error().Err(err).Msg("Failed to cleanup tmp directory")
+		// Don't return error here as cleanup failure shouldn't prevent startup
+	}
 	// Check that RabbitMQ relevant Queue is available.
 	// If relevant queue does not exist, inform the user that there is one Naabum8 running at this moment and advise the user to wait for the latest results.
 	orchestrator8, err := orchestrator8.NewOrchestrator8()
@@ -175,6 +183,12 @@ func (m *Controller8Numate) NumateScan(c *gin.Context) {
 // POST body contains more particular options for the scan. Among those possible options, Workflow scans are of special interest.
 // The scans will run through only the root/base HTTP Endpoints.
 func (m *Controller8Numate) NumateDomain(c *gin.Context) {
+	// Clean up old files in tmp directory (older than 24 hours)
+	cleanup := cleanup8.NewCleanup8()
+	if err := cleanup.CleanupDirectory("tmp", 24*time.Hour); err != nil {
+		log8.BaseLogger.Error().Err(err).Msg("Failed to cleanup tmp directory")
+		// Don't return error here as cleanup failure shouldn't prevent startup
+	}
 	DB := m.Db
 	var post model8.PostOptionsScan8
 	var uri model8.Domain8Uri
@@ -226,6 +240,12 @@ func (m *Controller8Numate) NumateDomain(c *gin.Context) {
 // POST body contains more particular options for the scan. Among those possible options, Workflow scans are of special interest.
 // The scans will run through each in-scope URL resource found in Burp sitemap.
 func (m *Controller8Numate) NumateHostname(c *gin.Context) {
+	// Clean up old files in tmp directory (older than 24 hours)
+	cleanup := cleanup8.NewCleanup8()
+	if err := cleanup.CleanupDirectory("tmp", 24*time.Hour); err != nil {
+		log8.BaseLogger.Error().Err(err).Msg("Failed to cleanup tmp directory")
+		// Don't return error here as cleanup failure shouldn't prevent startup
+	}
 	DB := m.Db
 	var post model8.PostOptionsScan8
 	var uri model8.Hostname8Uri
@@ -277,6 +297,12 @@ func (m *Controller8Numate) NumateHostname(c *gin.Context) {
 // POST body contains more particular options for the scan. Among those possible options, Workflow scans are of special interest.
 // The scans will run through each in-scope URL resource found in Burp sitemap.
 func (m *Controller8Numate) NumateEndpoint(c *gin.Context) {
+	// Clean up old files in tmp directory (older than 24 hours)
+	cleanup := cleanup8.NewCleanup8()
+	if err := cleanup.CleanupDirectory("tmp", 24*time.Hour); err != nil {
+		log8.BaseLogger.Error().Err(err).Msg("Failed to cleanup tmp directory")
+		// Don't return error here as cleanup failure shouldn't prevent startup
+	}
 	DB := m.Db
 	var post model8.PostOptionsScan8
 	var uri model8.Endpoint8Uri
