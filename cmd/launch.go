@@ -62,7 +62,7 @@ var launchCmd = &cobra.Command{
 			if err != nil {
 				log8.BaseLogger.Debug().Msg(err.Error())
 				log8.BaseLogger.Fatal().Msg("Error in `Launch` command line when initialising the API endpoint.")
-				notification8.PoolHelper.PublishSysErrorNotification("Error in `Launch` command line when initialising the API endpoint", "urgent", "num8")
+				notification8.PoolHelper.PublishSysErrorNotification("Error in `Num8 Launch` command line when initialising the API endpoint", "urgent", "num8")
 				return err
 			}
 			a.Routes()
