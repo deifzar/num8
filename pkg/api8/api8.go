@@ -69,7 +69,7 @@ func (a *Api8) Init() error {
 	}
 	err = orchestrator8.InitOrchestrator()
 	if err != nil {
-		log8.BaseLogger.Error().Msg("Error bringin up the RabbitMQ exchanges.")
+		log8.BaseLogger.Error().Msg("Error bringing up the RabbitMQ exchanges.")
 		return err
 	}
 	err = orchestrator8.ActivateQueueByService("num8")
@@ -77,8 +77,11 @@ func (a *Api8) Init() error {
 		log8.BaseLogger.Error().Msg("Error bringing up the RabbitMQ queues for the `num8` service.")
 		return err
 	}
-	orchestrator8.CreateHandleAPICallByService("num8")
-	orchestrator8.ActivateConsumerByService("num8")
+	err = orchestrator8.ActivateConsumerByService("num8")
+	if err != nil {
+		log8.BaseLogger.Error().Msg("Error activating consumer with dedicated connection for the `num8` service.")
+		return err
+	}
 
 	a.Cnfg = v
 	a.DB = conn

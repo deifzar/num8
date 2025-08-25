@@ -2,7 +2,7 @@
 FROM alpine:3.20
 # Install only required build dependencies
 RUN apk upgrade --no-cache \
-    && apk add --no-cache bind-tools chromium ca-certificates tzdata gettext \
+    && apk add --no-cache bind-tools chromium ca-certificates tzdata gettext netcat-openbsd wget \
     && apk --no-cache upgrade \
     && rm -rf /var/cache/apk/* \
     && adduser -D -g '' appuser
@@ -10,9 +10,10 @@ RUN apk upgrade --no-cache \
 WORKDIR /app
 
 COPY --chown=appuser:appuser num8 /usr/local/bin/
-# Copy entrypoint script
+# Copy scripts
 COPY --chown=appuser:appuser docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+COPY --chown=appuser:appuser wait-for-rabbitmq.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/wait-for-rabbitmq.sh
 
 # Set ownership of the app directory
 RUN chown -R appuser:appuser /app
