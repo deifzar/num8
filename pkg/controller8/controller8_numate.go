@@ -350,111 +350,60 @@ func (m *Controller8Numate) NumateEndpoint(c *gin.Context) {
 	go m.RunNumateThoroughly([]model8.Endpoint8{e8}, options8, outputFileName)
 }
 
-// func (m *Controller8Numate) RunNumate(e8 []model8.Httpendpoint8, o8 model8.Model8Options8Interface, r8 model8.Model8Results8Interface) {
-// 	defer m.RabbitMQBringConsumerBack()
+func (m *Controller8Numate) HealthCheck(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"status":    "healthy",
+		"timestamp": time.Now().Format(time.RFC3339),
+		"service":   "num8",
+	})
+}
 
-// 	num8Discord := model8.NewModel8Discord8(
-// m.Config.GetString("Discord.webhookURL"),
-// m.Config.GetString("Discord.webhookID"),
-// m.Config.GetString("Discord.webhookName"),
-// m.Config.GetString("Discord.webhookToken"),
-// m.Config.GetString("Discord.botToken"))
-// 	err := num8Discord.InitialiseChannelID()
-// 	if err != nil {
-// 		log8.BaseLogger.Debug().Msg(err.Error())
-// 		return
-// 	}
-// 	discordBot, err := discordgo.New("Bot " + num8Discord.GetBotToken())
-// 	if err != nil {
-// 		log8.BaseLogger.Debug().Msg(err.Error())
-// 		return
-// 	}
-// 	discordBot.ChannelMessageSend(num8Discord.GetChannelID(), "Num8 scans are running!")
-// 	// create nuclei engine with options
-// 	ne, err := nuclei.NewNucleiEngine(o8.GetOptions()...)
-// 	if err != nil {
-// 		log8.BaseLogger.Debug().Msg(err.Error())
-// 		discordBot.ChannelMessageSend(num8Discord.GetChannelID(), err.Error())
-// 		return
-// 	}
-// 	defer ne.Close()
-// 	// load targets and optionally probe non http/https targets
-// 	var targets []string
-// 	for _, e := range e8 {
-// 		targets = append(targets, e.Endpoint)
-// 	}
-// 	ne.LoadTargets(targets, false)
-// 	err = ne.ExecuteWithCallback(nil)
-// 	if err != nil {
-// 		// panic(err)
-// 		log8.BaseLogger.Debug().Msg(err.Error())
-// 		discordBot.ChannelMessageSend(num8Discord.GetChannelID(), err.Error())
-// 		return
-// 	}
-// 	discordBot.ChannelMessageSend(num8Discord.GetChannelID(), "Num8 scans have finished!")
-// 	if err = r8.SetResultEventFromOutputfilename(); err != nil {
-// 		log8.BaseLogger.Debug().Msg(err.Error())
-// 		discordBot.ChannelMessageSend(num8Discord.GetChannelID(), err.Error())
-// 		return
-// 	}
-// 	if err = num8Discord.SetChatMessages(r8.GetResultEvent()); err != nil {
-// 		log8.BaseLogger.Debug().Msg(err.Error())
-// 		discordBot.ChannelMessageSend(num8Discord.GetChannelID(), err.Error())
-// 		return
-// 	}
-// 	// log.Println(num8Discord.ChatMessages)
-// 	if num8Discord.GetChatMessages() != nil {
-// 		for _, messagesHost := range num8Discord.GetChatMessages() {
-// 			if messagesHost.Per_host != nil {
-// 				discordBot.ChannelMessageSend(num8Discord.GetChannelID(), "------------------------------------------------------------------")
-// 				discordBot.ChannelMessageSend(num8Discord.GetChannelID(), ":desktop:  Vulnerabilities for host: "+messagesHost.Host+"  :desktop:")
-// 				discordBot.ChannelMessageSend(num8Discord.GetChannelID(), "------------------------------------------------------------------")
-// 				for _, messagesHostPort := range messagesHost.Per_host {
-// 					if messagesHostPort.Per_port != nil {
-// 						for _, messagesHostPortSeverity := range messagesHostPort.Per_port {
-// 							if messagesHostPortSeverity.Per_severity != nil {
-// 								var colorEmoji string
-// 								switch riskLevel := messagesHostPortSeverity.Severity; riskLevel {
-// 								case "info":
-// 									colorEmoji = ":blue_circle:"
-// 								case "low":
-// 									colorEmoji = ":green_circle:"
-// 								case "medium":
-// 									colorEmoji = ":orange_circle:"
-// 								case "high":
-// 									colorEmoji = ":red_circle:"
-// 								case "criticial":
-// 									colorEmoji = ":exclamation::red_circle:"
-// 								default:
-// 									colorEmoji = ":question:"
+func (m *Controller8Numate) ReadinessCheck(c *gin.Context) {
+	dbHealthy := true
+	rbHealthy := true
+	if err := m.Db.Ping(); err != nil {
+		log8.BaseLogger.Error().Err(err).Msg("Database ping failed during readiness check")
+		dbHealthy = false
+	}
+	dbStatus := "unhealthy"
+	if dbHealthy {
+		dbStatus = "healthy"
+	}
 
-// 								}
-// 								numFindginsPerSeverity := strconv.Itoa(len(messagesHostPortSeverity.Per_severity))
-// 								discordBot.ChannelMessageSend(num8Discord.GetChannelID(), ":space_invader: **"+strings.ToUpper(numFindginsPerSeverity)+"** "+messagesHostPortSeverity.Severity+" severity risk level findings for "+messagesHost.Host+":"+messagesHostPort.Port)
-// 								discordBot.ChannelMessageSend(num8Discord.GetChannelID(), "------------------------------------------------------------------")
-// 								for _, messagesHostPortSeverityFinding := range messagesHostPortSeverity.Per_severity {
-// 									discordBot.ChannelMessageSend(num8Discord.GetChannelID(), colorEmoji+" Template ("+messagesHostPortSeverityFinding.Type+"): "+messagesHostPortSeverityFinding.Template)
-// 									discordBot.ChannelMessageSend(num8Discord.GetChannelID(), "Info: "+messagesHostPortSeverityFinding.Info)
-// 									discordBot.ChannelMessageSend(num8Discord.GetChannelID(), "Description: "+messagesHostPortSeverityFinding.Description)
-// 								}
-// 							} else {
-// 								discordBot.ChannelMessageSend(num8Discord.GetChannelID(), "0 "+messagesHostPortSeverity.Severity+" severity risk level finding for "+messagesHost.Host+":"+messagesHostPort.Port)
-// 							}
-// 						}
-// 					} else {
-// 						discordBot.ChannelMessageSend(num8Discord.GetChannelID(), "Empty results for "+messagesHost.Host+":"+messagesHostPort.Port)
-// 					}
-// 				}
-// 			} else {
-// 				discordBot.ChannelMessageSend(num8Discord.GetChannelID(), "Empty results for host: "+messagesHost.Host)
-// 			}
-// 		}
-// 	} else {
-// 		discordBot.ChannelMessageSend(num8Discord.GetChannelID(), "No results found.")
-// 	}
-// 	// RabbitMQ publish message for ASMM8
-// 	m.RabbitMQPublishMessage()
-// }
+	queue_consumer := m.Cnfg.GetStringSlice("ORCHESTRATORM8.num8.Queue")
+	qargs_consumer := m.Cnfg.GetStringMap("ORCHESTRATORM8.num8.Queue-arguments")
+
+	if !m.Orch.ExistQueue(queue_consumer[1], qargs_consumer) || !m.Orch.ExistConsumersForQueue(queue_consumer[1]) {
+		rbHealthy = false
+	}
+
+	rbStatus := "unhealthy"
+	if rbHealthy {
+		rbStatus = "healthy"
+	}
+
+	if dbHealthy && rbHealthy {
+		c.JSON(http.StatusOK, gin.H{
+			"status":    "ready",
+			"timestamp": time.Now().Format(time.RFC3339),
+			"service":   "num8",
+			"checks": gin.H{
+				"database": dbStatus,
+				"rabbitmq": rbStatus,
+			},
+		})
+	} else {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status":    "not ready",
+			"timestamp": time.Now().Format(time.RFC3339),
+			"service":   "num8",
+			"checks": gin.H{
+				"database": dbStatus,
+				"rabbitmq": rbStatus,
+			},
+		})
+	}
+}
 
 func (m *Controller8Numate) RunNumate(fullscan bool, e8 []model8.Endpoint8, o8 model8.Model8Options8Interface, outputFileName string) {
 

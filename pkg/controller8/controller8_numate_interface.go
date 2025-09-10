@@ -11,6 +11,8 @@ type Controller8NumateInterface interface {
 	NumateDomain(*gin.Context)
 	NumateHostname(*gin.Context)
 	NumateEndpoint(*gin.Context)
+	HealthCheck(c *gin.Context)
+	ReadinessCheck(c *gin.Context)
 	// ConfigureEngine(model8.PostOptionsScan8) (model8.Model8Options8Interface, model8.Model8Results8Interface, error)
 	ConfigureEngine(model8.PostOptionsScan8) (model8.Model8Options8Interface, string, error)
 	RunNumate(bool, []model8.Endpoint8, model8.Model8Options8Interface, string)

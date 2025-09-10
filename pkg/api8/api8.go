@@ -96,6 +96,11 @@ func (a *Api8) Routes() {
 	r.POST("/domain/:id/scan", contrNumate.NumateDomain)
 	r.POST("/hostname/:id/scan", contrNumate.NumateHostname)
 	r.POST("/endpoint/:id/scan", contrNumate.NumateEndpoint)
+
+	// Health live probes
+	r.GET("/health", contrNumate.HealthCheck)
+	r.GET("/ready", contrNumate.ReadinessCheck)
+
 	a.Router = r
 }
 
