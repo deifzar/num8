@@ -373,7 +373,7 @@ func (m *Controller8Numate) ReadinessCheck(c *gin.Context) {
 	queue_consumer := m.Cnfg.GetStringSlice("ORCHESTRATORM8.num8.Queue")
 	qargs_consumer := m.Cnfg.GetStringMap("ORCHESTRATORM8.num8.Queue-arguments")
 
-	if !m.Orch.ExistQueue(queue_consumer[1], qargs_consumer) || !m.Orch.ExistConsumersForQueue(queue_consumer[1]) {
+	if !m.Orch.ExistQueue(queue_consumer[1], qargs_consumer) || !m.Orch.ExistConsumersForQueue(queue_consumer[1], qargs_consumer) {
 		rbHealthy = false
 	}
 
