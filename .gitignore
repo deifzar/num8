@@ -4,7 +4,7 @@
 /help.txt
 
 # configuration files
-/configuration.yaml
+configs/*
 
 # other session files
 resume.cfg
