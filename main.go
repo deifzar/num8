@@ -23,6 +23,6 @@ import (
 
 func main() {
 	syscall.Umask(0027) // Files: 640, Dirs: 750
-	log8.GetLogger("log/num8.log")
+	log8.GetLogger("num8.log")
 	cmd.Execute()
 }
