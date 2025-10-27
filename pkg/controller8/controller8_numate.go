@@ -220,7 +220,7 @@ func (m *Controller8Numate) NumateDomain(c *gin.Context) {
 		return
 	}
 	if len(e8) < 1 {
-		c.JSON(http.StatusOK, gin.H{"msg": "OK! Num8 Scan Domain are about to commence.\nCheck Discord for any update about the scans."})
+		c.JSON(http.StatusOK, gin.H{"msg": "OK! Num8 Scan Domain are about to commence."})
 		log8.BaseLogger.Info().Msg("Num8 Scan Domain success. No domain in scope.")
 		return
 	}
@@ -232,7 +232,7 @@ func (m *Controller8Numate) NumateDomain(c *gin.Context) {
 		return
 	}
 	go m.RunNumate(false, e8, options8, outputFileName)
-	c.JSON(http.StatusOK, gin.H{"msg": "OK! Num8 Scan Domain are about to commence.\nCheck Discord for any update about the scans."})
+	c.JSON(http.StatusOK, gin.H{"msg": "OK! Num8 Scan Domain are about to commence."})
 	log8.BaseLogger.Info().Msg("Num8 Scan Domain running.")
 }
 
@@ -277,7 +277,7 @@ func (m *Controller8Numate) NumateHostname(c *gin.Context) {
 		return
 	}
 	if len(e8) < 1 {
-		c.JSON(http.StatusOK, gin.H{"msg": "OK! Num8 Scan Hostname are about to commence.\nCheck Discord for any update about the scans."})
+		c.JSON(http.StatusOK, gin.H{"msg": "OK! Num8 Scan Hostname are about to commence."})
 		log8.BaseLogger.Info().Msg("Num8 Scan Hostname success. No domain in scope.")
 		return
 	}
@@ -289,7 +289,7 @@ func (m *Controller8Numate) NumateHostname(c *gin.Context) {
 		return
 	}
 	go m.RunNumateThoroughly(e8, options8, outputFileName)
-	c.JSON(http.StatusOK, gin.H{"msg": "Num8 Scan Hostname running. Check Discord for any update about the scans."})
+	c.JSON(http.StatusOK, gin.H{"msg": "Num8 Scan Hostname running."})
 	log8.BaseLogger.Info().Msg("Num8 Scan Hostname running.")
 }
 
@@ -334,7 +334,7 @@ func (m *Controller8Numate) NumateEndpoint(c *gin.Context) {
 		return
 	}
 	if reflect.ValueOf(e8).IsZero() {
-		c.JSON(http.StatusOK, gin.H{"msg": "OK! Num8 Scan Endpoint are about to commence.\nCheck Discord for any update about the scans."})
+		c.JSON(http.StatusOK, gin.H{"msg": "OK! Num8 Scan Endpoint are about to commence."})
 		log8.BaseLogger.Info().Msg("Num8 Scan Endpoint success. No domain in scope.")
 		return
 	}
@@ -345,7 +345,7 @@ func (m *Controller8Numate) NumateEndpoint(c *gin.Context) {
 		log8.BaseLogger.Warn().Msg("HTTP Repose 500 - Num8 Scan Endpoint failed - Configure scan failed")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"msg": "OK! Num8 Scan Endpoint are about to commence.\nCheck Discord for any update about the scans."})
+	c.JSON(http.StatusOK, gin.H{"msg": "OK! Num8 Scan Endpoint are about to commence."})
 	log8.BaseLogger.Info().Msg("Num8 Scan Endpoint running.")
 	go m.RunNumateThoroughly([]model8.Endpoint8{e8}, options8, outputFileName)
 }

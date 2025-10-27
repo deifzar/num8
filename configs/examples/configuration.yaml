@@ -79,12 +79,6 @@ NUM8: # Nuclei scan settins and Burp API and Proxy location
   templateSources:
     - http://127.0.0.1:8000/
     - http://127.0.0.1:8000/ 
-Discord: # Discord webhook and bot details
-  webhookURL: "https://discord.com/api/webhooks/...."
-  webhookID: "111111111111111111"
-  webhookName: "name"
-  webhookToken: "token"
-  botToken: "bottoken"
 Database: # PostgreSQL connection details
   location: "hostname"
   port: 5432
