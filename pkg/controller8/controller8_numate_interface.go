@@ -19,6 +19,7 @@ type Controller8NumateInterface interface {
 	// CommitResults will insert the issues found into the database. This function internally parses the slice of `securityissues8` into a slice of `historyissue8` DB model.
 	// Returns one boolean value that flags if new security issues have been found and one string value with the highest severity risk finding: critical, high or normal
 	CommitResults(securityIssues []model8.SecurityIssues8, e8 []model8.Endpoint8) (bool, string, error)
+	handleNotificationErrorOnFullscan(fullscan bool, message string, urgency string)
 	// RunNumate([]model8.Httpendpoint8, model8.Model8Options8Interface, model8.Model8Results8Interface)
 	// RabbitMQBringConsumerBackAndPublishMessage() error
 }

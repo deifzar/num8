@@ -121,8 +121,7 @@ func (m *Controller8Numate) NumateScan(c *gin.Context) {
 			// move on and call asmm8 scan
 			log8.BaseLogger.Debug().Msg(err.Error())
 			log8.BaseLogger.Warn().Msg("HTTP Repose 500 - Num8 Scan failed - Error fetching the endpoints.")
-			m.Orch.PublishToExchange(publishingdetails[0], publishingdetails[1], nil, publishingdetails[2])
-			notification8.PoolHelper.PublishSysErrorNotification("NumateScan - Error fetching the endpoints.", "urgent", "num8")
+			m.handleNotificationErrorOnFullscan(true, "NumateScan - Error fetching the endpoints.", "urgent")
 			c.JSON(http.StatusBadGateway, gin.H{"status": "error", "msg": "Num8 Scan failed - Error fetching the endpoints."})
 			return
 		}
@@ -141,8 +140,7 @@ func (m *Controller8Numate) NumateScan(c *gin.Context) {
 			// move on and call asmm8 scan
 			log8.BaseLogger.Debug().Msg(err.Error())
 			log8.BaseLogger.Warn().Msg("HTTP Repose 500 - Num8 Scan failed - scan configuration failed")
-			m.Orch.PublishToExchange(publishingdetails[0], publishingdetails[1], nil, publishingdetails[2])
-			notification8.PoolHelper.PublishSysErrorNotification("NumateScan - scan configuration has failed.", "urgent", "num8")
+			m.handleNotificationErrorOnFullscan(true, "NumateScan - scan configuration has failed.", "urgent")
 			c.JSON(http.StatusBadGateway, gin.H{"status": "error", "msg": "Numate Scan failed - scan configuration has failed"})
 			return
 		}
@@ -160,8 +158,7 @@ func (m *Controller8Numate) NumateScan(c *gin.Context) {
 		if err != nil {
 			// move on and call asmm8 scan
 			log8.BaseLogger.Fatal().Msg("HTTP 500 Response - Num8 Scans failed - Error bringing up the RabbitMQ queues for the Num8 service.")
-			m.Orch.PublishToExchange(publishingdetails[0], publishingdetails[1], nil, publishingdetails[2])
-			notification8.PoolHelper.PublishSysErrorNotification("NumateScan - Error bringing up the RabbitMQ queues for the Num8 service.", "urgent", "num8")
+			m.handleNotificationErrorOnFullscan(true, "NumateScan - Error bringing up the RabbitMQ queues for the Num8 service.", "urgent")
 			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "msg": "Num8 Scans failed. Error bringing up the RabbitMQ queues for the Num8 service."})
 			return
 		}
@@ -172,8 +169,7 @@ func (m *Controller8Numate) NumateScan(c *gin.Context) {
 	} else {
 		// move on and call asmm8 scan
 		log8.BaseLogger.Info().Msg("Num8 Scan API call forbidden")
-		m.Orch.PublishToExchange(publishingdetails[0], publishingdetails[1], nil, publishingdetails[2])
-		notification8.PoolHelper.PublishSysErrorNotification("NumateScan - Launching Num8 Scan is not possible at this moment due to non-existent RabbitMQ queues.", "urgent", "num8")
+		m.handleNotificationErrorOnFullscan(true, "NumateScan - Launching Num8 Scan is not possible at this moment due to non-existent RabbitMQ queues.", "urgent")
 		c.JSON(http.StatusForbidden, gin.H{"status": "forbidden", "msg": "Num8 Scans failed - Launching Num8 Scan is not possible at this moment due to non-existent RabbitMQ queues."})
 		return
 	}
@@ -350,6 +346,16 @@ func (m *Controller8Numate) NumateEndpoint(c *gin.Context) {
 	go m.RunNumateThoroughly([]model8.Endpoint8{e8}, options8, outputFileName)
 }
 
+// handleNotificationErrorOnFullscan handles errors when fullscan is true by publishing to RabbitMQ and sending error notifications
+func (m *Controller8Numate) handleNotificationErrorOnFullscan(fullscan bool, message string, urgency string) {
+	if fullscan {
+		publishingdetails := m.Cnfg.GetStringSlice("ORCHESTRATORM8.num8.Publisher")
+		m.Orch.PublishToExchange(publishingdetails[0], publishingdetails[1], nil, publishingdetails[2])
+		notification8.PoolHelper.PublishSysErrorNotification(message, urgency, "num8")
+		log8.BaseLogger.Info().Msg("Published message to RabbitMQ for next service (asmm8)")
+	}
+}
+
 func (m *Controller8Numate) HealthCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":    "healthy",
@@ -412,6 +418,8 @@ func (m *Controller8Numate) RunNumate(fullscan bool, e8 []model8.Endpoint8, o8 m
 	ne, err := nuclei.NewNucleiEngineCtx(context.Background(), o8.GetOptions()...)
 	if err != nil {
 		log8.BaseLogger.Debug().Msg(err.Error())
+		log8.BaseLogger.Info().Msg("Nuclei engine initialisation error")
+		m.handleNotificationErrorOnFullscan(fullscan, "RunNumate - Nuclei engine initialisation error.", "normal")
 		return
 	}
 	defer ne.Close()
@@ -424,24 +432,26 @@ func (m *Controller8Numate) RunNumate(fullscan bool, e8 []model8.Endpoint8, o8 m
 	err = ne.ExecuteWithCallback(nil)
 	if err != nil {
 		log8.BaseLogger.Debug().Msg(err.Error())
-		log8.BaseLogger.Info().Msg("there was an error in the execution of nuclei")
+		log8.BaseLogger.Info().Msg("there was an error during the execution of nuclei")
+		m.handleNotificationErrorOnFullscan(fullscan, "RunNumate - there was an error during the execution of nuclei.", "normal")
 		return
 	}
 	log8.BaseLogger.Info().Msg("Num8 scans have finished!")
 	// outputFileName = "./tmp/result-2025-3-4-11-30-14559570398"
 	securityIssues, err := model8.ParseNum8ScanResults(outputFileName)
 	if err != nil {
-		log8.BaseLogger.Error().Msg("Num8 scan results parsed with errors")
+		log8.BaseLogger.Error().Msg("Parsing Num8 scans has thrown errors")
 		log8.BaseLogger.Debug().Msg(err.Error())
+		m.handleNotificationErrorOnFullscan(fullscan, "RunNumate - Parsing Num8 scans has thrown errors.", "normal")
 		return
-	} else {
-		log8.BaseLogger.Info().Msg("Num8 scan results parsed ok!")
 	}
+	log8.BaseLogger.Info().Msg("Parsing Num8 scan went ok!")
 
 	// Commit latest Num8 results into the DB
 	notify, urgent, err := m.CommitResults(securityIssues, e8)
 	if err != nil {
 		log8.BaseLogger.Error().Msg("error after attempt to commit results")
+		m.handleNotificationErrorOnFullscan(fullscan, "RunNumate - error after attempt to commit results.", "normal")
 		return
 	}
 	if fullscan {
