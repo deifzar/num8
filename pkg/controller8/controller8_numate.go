@@ -462,6 +462,7 @@ func (m *Controller8Numate) RunNumate(fullscan bool, e8 []model8.Endpoint8, o8 m
 			notification8.PoolHelper.PublishSecurityNotificationAdmin("New security issues have been found", urgent, "num8")
 			notification8.PoolHelper.PublishSecurityNotificationUser("New security issues have been found", urgent, "num8")
 		}
+		log8.BaseLogger.Info().Msg("Published message to RabbitMQ for next service (asmm8)")
 	}
 }
 
