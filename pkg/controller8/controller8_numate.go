@@ -412,11 +412,44 @@ func (m *Controller8Numate) ReadinessCheck(c *gin.Context) {
 }
 
 func (m *Controller8Numate) RunNumate(fullscan bool, e8 []model8.Endpoint8, o8 model8.Model8Options8Interface, outputFileName string) {
-
+	var scanCompleted bool = false
+	var scanFailed bool = false
+	var notify bool = false
+	var urgent string = "normal"
+	if fullscan {
+		defer func() {
+			var payload any = nil
+			// call naabum8 scan
+			if scanFailed {
+				/* DO NOTHING - Message already published with handleNotificationErrorOnFullscan */
+			} else if !scanCompleted {
+				payload = map[string]interface{}{
+					"status":  "incomplete",
+					"message": "NuM8 scan did not complete. Unexpected errors.",
+				}
+				publishingdetails := m.Cnfg.GetStringSlice("ORCHESTRATORM8.num8.Publisher")
+				m.Orch.PublishToExchange(publishingdetails[0], publishingdetails[1], payload, publishingdetails[2])
+				log8.BaseLogger.Info().Msg("Published message to RabbitMQ for next service (asmm8)")
+			} else {
+				payload = map[string]interface{}{
+					"status":  "complete",
+					"message": "KatanaM8 scan run successfully!",
+				}
+				publishingdetails := m.Cnfg.GetStringSlice("ORCHESTRATORM8.num8.Publisher")
+				m.Orch.PublishToExchange(publishingdetails[0], publishingdetails[1], nil, publishingdetails[2])
+				if notify {
+					notification8.PoolHelper.PublishSecurityNotificationAdmin("New security issues have been found", urgent, "num8")
+					notification8.PoolHelper.PublishSecurityNotificationUser("New security issues have been found", urgent, "num8")
+				}
+				log8.BaseLogger.Info().Msg("Published message to RabbitMQ for next service (asmm8)")
+			}
+		}()
+	}
 	log8.BaseLogger.Info().Msg("Num8 scans are running!")
 	// create nuclei engine with options
 	ne, err := nuclei.NewNucleiEngineCtx(context.Background(), o8.GetOptions()...)
 	if err != nil {
+		scanFailed = true
 		log8.BaseLogger.Debug().Msg(err.Error())
 		log8.BaseLogger.Info().Msg("Nuclei engine initialisation error")
 		m.handleNotificationErrorOnFullscan(fullscan, "RunNumate - Nuclei engine initialisation error.", "urgent")
@@ -431,6 +464,7 @@ func (m *Controller8Numate) RunNumate(fullscan bool, e8 []model8.Endpoint8, o8 m
 	ne.LoadTargets(targets, false)
 	err = ne.ExecuteWithCallback(nil)
 	if err != nil {
+		scanFailed = true
 		log8.BaseLogger.Debug().Msg(err.Error())
 		log8.BaseLogger.Info().Msg("there was an error during the execution of nuclei")
 		m.handleNotificationErrorOnFullscan(fullscan, "RunNumate - there was an error during the execution of nuclei.", "urgent")
@@ -440,6 +474,7 @@ func (m *Controller8Numate) RunNumate(fullscan bool, e8 []model8.Endpoint8, o8 m
 	// outputFileName = "./tmp/result-2025-3-4-11-30-14559570398"
 	securityIssues, err := model8.ParseNum8ScanResults(outputFileName)
 	if err != nil {
+		scanFailed = true
 		log8.BaseLogger.Error().Msg("Parsing Num8 scans has thrown errors")
 		log8.BaseLogger.Debug().Msg(err.Error())
 		m.handleNotificationErrorOnFullscan(fullscan, "RunNumate - Parsing Num8 scans has thrown errors.", "urgent")
@@ -448,22 +483,16 @@ func (m *Controller8Numate) RunNumate(fullscan bool, e8 []model8.Endpoint8, o8 m
 	log8.BaseLogger.Info().Msg("Parsing Num8 scan went ok!")
 
 	// Commit latest Num8 results into the DB
-	notify, urgent, err := m.CommitResults(securityIssues, e8)
+	notify, urgent, err = m.CommitResults(securityIssues, e8)
 	if err != nil {
+		scanFailed = true
 		log8.BaseLogger.Error().Msg("error after attempt to commit results")
 		m.handleNotificationErrorOnFullscan(fullscan, "RunNumate - error after attempt to commit results.", "urgent")
 		return
 	}
-	if fullscan {
-		// call asmm8 scan
-		publishingdetails := m.Cnfg.GetStringSlice("ORCHESTRATORM8.num8.Publisher")
-		m.Orch.PublishToExchange(publishingdetails[0], publishingdetails[1], nil, publishingdetails[2])
-		if notify {
-			notification8.PoolHelper.PublishSecurityNotificationAdmin("New security issues have been found", urgent, "num8")
-			notification8.PoolHelper.PublishSecurityNotificationUser("New security issues have been found", urgent, "num8")
-		}
-		log8.BaseLogger.Info().Msg("Published message to RabbitMQ for next service (asmm8)")
-	}
+	// Scans have finished.
+	scanCompleted = true
+	log8.BaseLogger.Info().Msgf("Num8 scans have concluded successfully")
 }
 
 func (m *Controller8Numate) RunNumateThoroughly(e8 []model8.Endpoint8, o8 model8.Model8Options8Interface, outputFileName string) {
