@@ -418,30 +418,53 @@ func (m *Controller8Numate) RunNumate(fullscan bool, e8 []model8.Endpoint8, o8 m
 	var urgent string = "normal"
 	if fullscan {
 		defer func() {
+			// Recover from panic if any
+			if r := recover(); r != nil {
+				log8.BaseLogger.Error().Msgf("PANIC recovered in KatanaM8 scans: %v", r)
+				scanCompleted = false
+				scanFailed = true
+			}
 			var payload any = nil
 			// call naabum8 scan
 			if scanFailed {
 				/* DO NOTHING - Message already published with handleNotificationErrorOnFullscan */
-			} else if !scanCompleted {
-				payload = map[string]interface{}{
-					"status":  "incomplete",
-					"message": "NuM8 scan did not complete. Unexpected errors.",
-				}
-				publishingdetails := m.Cnfg.GetStringSlice("ORCHESTRATORM8.num8.Publisher")
-				m.Orch.PublishToExchange(publishingdetails[0], publishingdetails[1], payload, publishingdetails[2])
-				log8.BaseLogger.Info().Msg("Published message to RabbitMQ for next service (asmm8)")
 			} else {
-				payload = map[string]interface{}{
-					"status":  "complete",
-					"message": "KatanaM8 scan run successfully!",
+				if !scanCompleted {
+					payload = map[string]interface{}{
+						"status":  "incomplete",
+						"message": "NuM8 scan did not complete. Unexpected errors.",
+					}
+				} else {
+					payload = map[string]interface{}{
+						"status":  "complete",
+						"message": "KatanaM8 scan run successfully!",
+					}
+					if notify {
+						notification8.PoolHelper.PublishSecurityNotificationAdmin("New security issues have been found", urgent, "num8")
+						notification8.PoolHelper.PublishSecurityNotificationUser("New security issues have been found", urgent, "num8")
+					}
 				}
 				publishingdetails := m.Cnfg.GetStringSlice("ORCHESTRATORM8.num8.Publisher")
-				m.Orch.PublishToExchange(publishingdetails[0], publishingdetails[1], nil, publishingdetails[2])
-				if notify {
-					notification8.PoolHelper.PublishSecurityNotificationAdmin("New security issues have been found", urgent, "num8")
-					notification8.PoolHelper.PublishSecurityNotificationUser("New security issues have been found", urgent, "num8")
+				err := m.Orch.PublishToExchange(publishingdetails[0], publishingdetails[1], payload, publishingdetails[2])
+				if err != nil {
+					log8.BaseLogger.Error().Msgf("Failed to publish to exchange: %v", err)
+					// Retry once after brief delay
+					time.Sleep(5 * time.Second)
+					retryErr := m.Orch.PublishToExchange(publishingdetails[0], publishingdetails[1], payload, publishingdetails[2])
+					if retryErr != nil {
+						log8.BaseLogger.Error().Msgf("Retry failed: %v", retryErr)
+						// Last resort: urgent notification
+						notification8.PoolHelper.PublishSysErrorNotification(
+							"CRITICAL: Failed to notify ASMM8 after NuM8 scan",
+							"urgent",
+							"num8",
+						)
+					} else {
+						log8.BaseLogger.Info().Msg("Published message to RabbitMQ for next service (asmm8) - retry succeeded")
+					}
+				} else {
+					log8.BaseLogger.Info().Msg("Published message to RabbitMQ for next service (asmm8)")
 				}
-				log8.BaseLogger.Info().Msg("Published message to RabbitMQ for next service (asmm8)")
 			}
 		}()
 	}
