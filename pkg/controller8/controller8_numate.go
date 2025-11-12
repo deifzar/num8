@@ -108,6 +108,15 @@ func (m *Controller8Numate) NumateScan(c *gin.Context) {
 		log8.BaseLogger.Error().Err(err).Msg("Failed to cleanup tmp directory")
 		// Don't return error here as cleanup failure shouldn't prevent startup
 	}
+	// Extract delivery tag from request header (set by RabbitMQ handler)
+	deliveryTagStr := c.GetHeader("X-RabbitMQ-Delivery-Tag")
+	var deliveryTag uint64
+	if deliveryTagStr != "" {
+		if tag, err := strconv.ParseUint(deliveryTagStr, 10, 64); err == nil {
+			deliveryTag = tag
+			log8.BaseLogger.Debug().Msgf("Scan triggered via RabbitMQ (deliveryTag: %d)", deliveryTag)
+		}
+	}
 	// Check that RabbitMQ relevant Queue is available.
 	// If relevant queue does not exist, inform the user that there is one Naabum8 running at this moment and advise the user to wait for the latest results.
 	queue_consumer := m.Cnfg.GetStringSlice("ORCHESTRATORM8.num8.Queue")
@@ -122,6 +131,11 @@ func (m *Controller8Numate) NumateScan(c *gin.Context) {
 			log8.BaseLogger.Debug().Msg(err.Error())
 			log8.BaseLogger.Warn().Msg("HTTP Repose 500 - Num8 Scan failed - Error fetching the endpoints.")
 			m.handleNotificationErrorOnFullscan(true, "NumateScan - Error fetching the endpoints.", "normal")
+			// ACK the message since we're not going to retry
+			if deliveryTag > 0 {
+				m.Orch.AckScanCompletion(deliveryTag, true) // Mark as "completed" even though it failed early
+				// OR use: m.Orch.NackScanMessage(deliveryTag, false) // Don't requeue - permanent failure
+			}
 			c.JSON(http.StatusBadGateway, gin.H{"status": "error", "msg": "Num8 Scan failed - Error fetching the endpoints."})
 			return
 		}
@@ -129,6 +143,11 @@ func (m *Controller8Numate) NumateScan(c *gin.Context) {
 			// move on and call asmm8 scan
 			log8.BaseLogger.Info().Msg("Num8 scan API call success. No targets in scope")
 			m.Orch.PublishToExchange(publishingdetails[0], publishingdetails[1], nil, publishingdetails[2])
+			// ACK the message since we're not going to retry
+			if deliveryTag > 0 {
+				m.Orch.AckScanCompletion(deliveryTag, true) // Mark as "completed" even though it failed early
+				// OR use: m.Orch.NackScanMessage(deliveryTag, false) // Don't requeue - permanent failure
+			}
 			c.JSON(http.StatusOK, gin.H{"msg": "Num8 scan API call success. No targets in scope."})
 			return
 		}
@@ -141,35 +160,39 @@ func (m *Controller8Numate) NumateScan(c *gin.Context) {
 			log8.BaseLogger.Debug().Msg(err.Error())
 			log8.BaseLogger.Warn().Msg("HTTP Repose 500 - Num8 Scan failed - scan configuration failed")
 			m.handleNotificationErrorOnFullscan(true, "NumateScan - scan configuration has failed.", "normal")
+			// ACK the message since we're not going to retry
+			if deliveryTag > 0 {
+				m.Orch.AckScanCompletion(deliveryTag, true) // Mark as "completed" even though it failed early
+				// OR use: m.Orch.NackScanMessage(deliveryTag, false) // Don't requeue - permanent failure
+			}
 			c.JSON(http.StatusBadGateway, gin.H{"status": "error", "msg": "Numate Scan failed - scan configuration has failed"})
 			return
 		}
-		// // cancel consumer
-		// err = orchestrator8.DeactivateConsumerByService("num8")
-		// if err != nil {
-		// 	// move on and call asmm8 scan
-		// 	orchestrator8.PublishMessageToExchangeAndCloseChannelConnection(exchange, "cptm8.asmm8.get.scan")
-		// 	log8.BaseLogger.Error().Msg("HTTP 500 Response - Num8 Full scans failed - Error cancelling the RabbitMQ consumer for `num8` before launching scan.")
-		// 	c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "msg": "Num8 Full scans failed. Error cancelling the RabbitMQ consumer."})
-		// 	return
-		// }
-		// bring the queue back with no consumers
 		err = m.Orch.ActivateQueueByService("num8")
 		if err != nil {
 			// move on and call asmm8 scan
 			log8.BaseLogger.Fatal().Msg("HTTP 500 Response - Num8 Scans failed - Error bringing up the RabbitMQ queues for the Num8 service.")
 			m.handleNotificationErrorOnFullscan(true, "NumateScan - Error bringing up the RabbitMQ queues for the Num8 service.", "normal")
+			// ACK the message since we're not going to retry
+			if deliveryTag > 0 {
+				m.Orch.AckScanCompletion(deliveryTag, true) // Mark as "completed" even though it failed early
+				// OR use: m.Orch.NackScanMessage(deliveryTag, false) // Don't requeue - permanent failure
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "msg": "Num8 Scans failed. Error bringing up the RabbitMQ queues for the Num8 service."})
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"msg": "Num8 scan API call success... Check notifications for scan updates."})
 		log8.BaseLogger.Info().Msg("Num8 scan API call success.")
 		// run active.
-		go m.RunNumate(true, e8, options8, outputFileName)
+		go m.RunNumate(true, e8, options8, outputFileName, deliveryTag)
 	} else {
 		// move on and call asmm8 scan
 		log8.BaseLogger.Info().Msg("Num8 Scan API call forbidden")
 		m.handleNotificationErrorOnFullscan(true, "NumateScan - Launching Num8 Scan is not possible at this moment due to non-existent RabbitMQ queues.", "normal")
+		// If this was a RabbitMQ-triggered scan, NACK it since we can't process
+		if deliveryTag > 0 {
+			m.Orch.NackScanMessage(deliveryTag, false) // Don't requeue - permanent config issue
+		}
 		c.JSON(http.StatusForbidden, gin.H{"status": "forbidden", "msg": "Num8 Scans failed - Launching Num8 Scan is not possible at this moment due to non-existent RabbitMQ queues."})
 		return
 	}
@@ -227,7 +250,7 @@ func (m *Controller8Numate) NumateDomain(c *gin.Context) {
 		log8.BaseLogger.Warn().Msg("HTTP Repose 500 - Num8 scan domain failed - Configure scan failed")
 		return
 	}
-	go m.RunNumate(false, e8, options8, outputFileName)
+	go m.RunNumate(false, e8, options8, outputFileName, 0)
 	c.JSON(http.StatusOK, gin.H{"msg": "OK! Num8 Scan Domain are about to commence."})
 	log8.BaseLogger.Info().Msg("Num8 Scan Domain running.")
 }
@@ -411,7 +434,7 @@ func (m *Controller8Numate) ReadinessCheck(c *gin.Context) {
 	}
 }
 
-func (m *Controller8Numate) RunNumate(fullscan bool, e8 []model8.Endpoint8, o8 model8.Model8Options8Interface, outputFileName string) {
+func (m *Controller8Numate) RunNumate(fullscan bool, e8 []model8.Endpoint8, o8 model8.Model8Options8Interface, outputFileName string, deliveryTag uint64) {
 	var scanCompleted bool = false
 	var scanFailed bool = false
 	var notify bool = false
@@ -445,9 +468,9 @@ func (m *Controller8Numate) RunNumate(fullscan bool, e8 []model8.Endpoint8, o8 m
 					}
 				}
 				publishingdetails := m.Cnfg.GetStringSlice("ORCHESTRATORM8.num8.Publisher")
-				err := m.Orch.PublishToExchange(publishingdetails[0], publishingdetails[1], payload, publishingdetails[2])
-				if err != nil {
-					log8.BaseLogger.Error().Msgf("Failed to publish to exchange: %v", err)
+				pubErr := m.Orch.PublishToExchange(publishingdetails[0], publishingdetails[1], payload, publishingdetails[2])
+				if pubErr != nil {
+					log8.BaseLogger.Error().Msgf("Failed to publish to exchange: %v", pubErr)
 					// Retry once after brief delay
 					time.Sleep(5 * time.Second)
 					retryErr := m.Orch.PublishToExchange(publishingdetails[0], publishingdetails[1], payload, publishingdetails[2])
@@ -459,11 +482,16 @@ func (m *Controller8Numate) RunNumate(fullscan bool, e8 []model8.Endpoint8, o8 m
 							"urgent",
 							"num8",
 						)
-					} else {
-						log8.BaseLogger.Info().Msg("Published message to RabbitMQ for next service (asmm8) - retry succeeded")
 					}
 				} else {
 					log8.BaseLogger.Info().Msg("Published message to RabbitMQ for next service (asmm8)")
+				}
+			}
+			// ACK or NACK the RabbitMQ message if deliveryTag is set
+			if deliveryTag > 0 {
+				ackErr := m.Orch.AckScanCompletion(deliveryTag, scanCompleted)
+				if ackErr != nil {
+					log8.BaseLogger.Error().Msgf("Failed to ACK/NACK message (deliveryTag: %d): %v", deliveryTag, ackErr)
 				}
 			}
 		}()
