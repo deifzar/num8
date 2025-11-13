@@ -77,8 +77,7 @@ func (a *Api8) Init() error {
 // This prevents consumers from receiving messages before the API can handle them.
 func (a *Api8) InitializeConsumerAfterReady() {
 	go func() {
-		locationService := a.Cnfg.GetString("ORCHESTRATORM8.Services.num8")
-		requestURL := locationService + "/health"
+		requestURL := "http://localhost:8003/health"
 
 		log8.BaseLogger.Info().Msg("Waiting for API service to become ready before activating RabbitMQ consumer...")
 
