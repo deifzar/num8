@@ -66,8 +66,11 @@ var launchCmd = &cobra.Command{
 				return err
 			}
 			a.Routes()
+			// Start goroutine to initialize consumer after API becomes ready
+			a.InitializeConsumerAfterReady()
 			a.Run(address)
 			log8.BaseLogger.Info().Msg("API service successfully running in " + address)
+			amqpM8.CleanupConnectionPool()
 			return nil
 		}
 	},
