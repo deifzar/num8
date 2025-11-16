@@ -1,5 +1,5 @@
 # Build
-FROM golang:1.23-alpine3.20 AS builder
+FROM golang:1.25-alpine3.22 AS builder
 RUN apk update && \ 
     apk add --no-cache ca-certificates tzdata && \
     adduser -D -g '' appuser
