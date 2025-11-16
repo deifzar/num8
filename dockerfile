@@ -18,7 +18,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o num8 .
 
 # Release
-FROM alpine:3.20
+FROM alpine:3.22
 RUN apk upgrade --no-cache && \
     apk add --no-cache chromium ca-certificates tzdata && \
     apk --no-cache upgrade && \
