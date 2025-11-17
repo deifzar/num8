@@ -54,7 +54,6 @@ NuM8 (Nuclei and BurpSuite Mate) is a production-grade Go microservice designed 
 - **Go** 1.21.5 or higher
 - **PostgreSQL** 14+ (for data persistence)
 - **RabbitMQ** 3.8+ (for message queuing)
-- **Nuclei** v3.3.5 (for vulnerability scanning)
 - **Burp Suite** (optional, for web application testing)
 - **Docker** (optional, for containerized deployment)
 
@@ -69,9 +68,6 @@ cd NuM8
 
 # Install Go dependencies
 go mod download
-
-# Install Nuclei
-go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.3.5
 
 # Build the binary
 go build -o num8 main.go
@@ -271,7 +267,6 @@ curl http://localhost:8003/endpoint/{endpoint-uuid}/issues
   "status": "ready",
   "database": "connected",
   "rabbitmq": "connected",
-  "nuclei": "installed",
   "timestamp": "2025-11-16T12:34:56Z"
 }
 ```
@@ -443,7 +438,6 @@ Comprehensive documentation is available in the [docs/](docs/) directory:
 | [PERFORMANCE.md](docs/PERFORMANCE.md) | Performance optimization and analysis |
 | [TODO.md](docs/TODO.md) | Known issues and roadmap |
 | [CODE_REVIEW.md](docs/CODE_REVIEW.md) | Code review checklist |
-| [CLAUDE.md](CLAUDE.md) | AI assistant guidance for working with this codebase |
 
 ---
 
@@ -453,7 +447,6 @@ NuM8 integrates with industry-standard security testing tools:
 
 | Tool | Version | Purpose | Integration |
 |------|---------|---------|-------------|
-| [Nuclei](https://github.com/projectdiscovery/nuclei) | v3.3.5 | Vulnerability scanning with templates | Binary execution |
 | [Burp Suite](https://portswigger.net/burp) | Professional/Enterprise | Web application security testing | REST API |
 
 ---
