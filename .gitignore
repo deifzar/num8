@@ -33,9 +33,6 @@ tmp/*
 # discord settings
 /discord
 
-# docs folder
-docs/*
-
 # AI
 .claude/*
 CLAUDE.md
